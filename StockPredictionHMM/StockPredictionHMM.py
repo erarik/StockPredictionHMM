@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 import time
 from datetime import timedelta
+from hmmlearn.hmm import GaussianHMM
+import matplotlib.pyplot as plt
 
 class StockDb(object):
     """ Stock Qutotes DB
@@ -79,6 +81,94 @@ class StockDb(object):
 
             self.seq_len_dict[key] = np.array(sequence_cat), sequence_lengths
 
+
+def print_model_stats(stock, model):
+    print("Number of states trained in model for {} is {}".format(stock, model.n_components))    
+    variance=np.array([np.diag(model.covars_[i]) for i in range(model.n_components)])    
+    for i in range(model.n_components):
+        print("hidden state #{}".format(i))
+        print("mean = ", model.means_[i])
+        print("variance = ", variance[i])
+        
+
+
+def train_a_stock(key, num_hidden_states):
+
+    stock= StockDb()
+    stock.df['fracchange'] = (stock.df['close'] - stock.df['open'])/stock.df['open']
+    stock.df['fraclow'] = (stock.df['low'] - stock.df['open'])/stock.df['open']
+    stock.df['frachigh'] = (stock.df['high'] - stock.df['open'])/stock.df['open']
+    stock.df['frachighlow'] = (stock.df['high'] - stock.df['low'])/stock.df['low']
+    stock.df['delta-volume']= stock.df['volume'].diff().fillna(0)
+    stock.df['delta-open']= stock.df['open'].diff().fillna(0)
+    stock.df['delta-close']= stock.df['close'].diff().fillna(0)
+    stock.df['delta-closeopen']= stock.df['open'] - stock.df['close'].shift(-1).fillna(0)
+
+    startdate=datetime.datetime(2018,3,6,0,0)
+    enddate=datetime.datetime(2018,4,2,0,0)
+    nbpredict = 40
+
+    features=['delta-closeopen', 'fracchange', 'delta-volume']
+    features_predict=['date','open', 'low', 'high', 'close']
+
+    predict_df = pd.DataFrame(columns=features_predict)
+    for i in range(nbpredict):
+        try:
+            train_df = stock.build_training(key, startdate, enddate, features)
+            X, lengths = train_df.get_stock_Xlengths(key)
+            model = GaussianHMM(n_components=num_hidden_states, n_iter=1000).fit(X, lengths)
+            logL = model.score(X, lengths)
+            state_sequence = model.predict(X, lengths)
+            prob_next_step = model.transmat_[state_sequence[-1], :]
+            state_most_probable = state_sequence[0]
+            state_feaures = model.means_[state_most_probable]
+                        
+            result={}
+            result['date']=train_df.nextdata['date'].iloc[-2]
+            result['logL']=logL
+            result['nbState']=model.n_components
+            result['state_most_probable']=state_most_probable
+            result['prob_state_most_probable']=max(prob_next_step)
+
+            result['open']=train_df.nextdata['close'].iloc[-1] +  state_feaures[features.index('delta-closeopen')]
+            result['close']=result['open'] * (1 + state_feaures[features.index('fracchange')])
+            result['fracchange'] = state_feaures[features.index('fracchange')]
+            result['delta-closeopen'] = state_feaures[features.index('delta-closeopen')]
+            predict_df = predict_df.append(result,  ignore_index=True)
+        except:
+            print("err")
+
+        enddate = train_df.nextdata['date'].iloc[-2]
+
+    real_df = stock.df[stock.df['symbol']==key]
+    res_df = pd.merge(real_df, predict_df, on='date')
+    res_df['err']=(res_df['fracchange_x']-res_df['fracchange_y'])/res_df['fracchange_x']
+    print("----------------------------------------")
+
+    # ========================
+    # Plot the data
+    # ========================
+    fig, axes = plt.subplots(nrows=1, ncols=2)
+     
+    res_df.plot(kind='line', color='Blue', x='date', y='fracchange_x', ax=axes[0], title='fracchange')
+    res_df.plot(kind='line', color='red', x='date', y='fracchange_y', ax=axes[0])
+     
+    res_df.plot(kind='line', color='Blue', x='date', y='err', ax=axes[1], title='fraclow')
+    #res_df.plot(kind='line', color='red', x='date', y='fraclow_y', ax=axes[1])
+     
+    plt.show()
+
+    print(res_df[['date','fracchange_x','fracchange_y']])
+
+    return result
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
     stock= StockDb()
     stock.df['ratio'] = (stock.df['close'] - stock.df['open'])/stock.df['open']
@@ -89,3 +179,4 @@ if __name__ == '__main__':
     train_df = stock.build_training('AMZN', startdate, enddate, ['volume', 'ratio', 'ratio2'])
     print("Training words: {}".format(train_df.stocks))
 
+    train_a_stock('AMZN', 5)
