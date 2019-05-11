@@ -7,6 +7,7 @@ import time
 from datetime import timedelta
 from hmmlearn.hmm import GaussianHMM
 import matplotlib.pyplot as plt
+import datetime
 
 class StockDb(object):
     """ Stock Qutotes DB
@@ -15,7 +16,6 @@ class StockDb(object):
 	definition named features, the following snippet may be used:
         stock = StockDb()
         stock.build_training(tr_file, features)
-        stock.build_test(tst_file, features)
     """
 
     def __init__(self,
@@ -45,9 +45,8 @@ class StockDb(object):
 
 
     def build_training(self, key, startdate, enddate, feature_list):
-        """ wrapper creates sequence data objects for training stocks suitable for hmmlearn library
+        """Creates sequence data objects for training stocks suitable for hmmlearn library
         :param feature_list: list of str label names
-        :param csvfilename: str
         :return: WordsData object
             dictionary of lists of feature list sequence lists for each stock
                 {'AMZN': [[[87, 225], [87, 225], ...], [[88, 219], [88, 219], ...]]]}
@@ -115,7 +114,7 @@ def train_a_stock(key, num_hidden_states):
     for i in range(nbpredict):
         try:
             train_df = stock.build_training(key, startdate, enddate, features)
-            X, lengths = train_df.get_stock_Xlengths(key)
+            X, lengths = train_df.seq_len_dict(key)
             model = GaussianHMM(n_components=num_hidden_states, n_iter=1000).fit(X, lengths)
             logL = model.score(X, lengths)
             state_sequence = model.predict(X, lengths)
