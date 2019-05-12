@@ -66,7 +66,7 @@ class StockDb(object):
         else:
             self._dict[key] = [new_sequence]         
 
-        self.nextdata = self.df[(self.df['date'] >= currdate) & (self.df['symbol']==key)]
+        self.nextdata = self.df[(self.df['date'] >= enddate) & (self.df['symbol']==key)]
 
 		#create hmmlearn data
         self.seq_len_dict = {}
@@ -176,6 +176,6 @@ if __name__ == '__main__':
     startdate=datetime.datetime(2018,3,6,0,0)
     enddate=datetime.datetime(2018,4,2,0,0)
     train_df = stock.build_training('AMZN', startdate, enddate, ['volume', 'ratio', 'ratio2'])
-    print("Training words: {}".format(train_df.stocks))
+
 
     train_a_stock('AMZN', 5)
