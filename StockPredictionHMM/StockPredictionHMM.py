@@ -12,8 +12,6 @@ import datetime
 class StockDb(object):
     """ Stock Qutotes DB
     This class has been designed to provide a convenient interface for individual stock data.
-    For example, to instantiate and load train/test files using a feature_method 
-	definition named features, the following snippet may be used:
         stock = StockDb()
         stock.build_training(tr_file, features)
     """
@@ -47,25 +45,28 @@ class StockDb(object):
     def build_training(self, key, startdate, enddate, feature_list):
         """Creates sequence data objects for training stocks suitable for hmmlearn library
         :param feature_list: list of str label names
-        :return: WordsData object
-            dictionary of lists of feature list sequence lists for each stock
+            dictionary of lists of feature
                 {'AMZN': [[[87, 225], [87, 225], ...], [[88, 219], [88, 219], ...]]]}
         """
         self._dict = {}
         new_sequence = []
 
+        #get symbol data between start and end date
         _df = self.df[(self.df['date'] >= startdate) & (self.df['date'] <= enddate) & (self.df['symbol']==key)]
 
+        #sequences as an array
         for index, data in _df.iterrows():
             sample = [float(data[f]) for f in feature_list]
             if len(sample) > 0:  
                 new_sequence.append(sample)            
             
+        #build symbol dictionary with sequences
         if key in self._dict:
-            self._dict[key].append(new_sequence) # list of sequences
+            self._dict[key].append(new_sequence)
         else:
             self._dict[key] = [new_sequence]         
 
+        #get symbol data after end date
         self.nextdata = self.df[(self.df['date'] >= enddate) & (self.df['symbol']==key)]
 
 		#create hmmlearn data
